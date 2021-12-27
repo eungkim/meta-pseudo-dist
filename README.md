@@ -1,2 +1,2 @@
-# meta-representation-learning
+# MetaPD
 Pytorch implementation of meta pseudo distribution
