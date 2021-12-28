@@ -1,2 +1,2 @@
-# MetaPD, Meta Pseudo Distribution
+# MetaPD: Meta Pseudo Distribution
 Pytorch implementation of meta pseudo distribution
