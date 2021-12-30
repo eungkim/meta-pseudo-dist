@@ -35,6 +35,8 @@ def build_model(name):
         model = ResNet32(args.dataset=='cifar10' and 10 or 100)
     elif name=="teacher":
         model = Student(args.dataset=='cifar10' and 10 or 100)
+    else:
+        print("wrong model name, choose student or teacher")
 
     if torch.cuda.is_available():
         model.cuda()
@@ -134,11 +136,11 @@ def test(model, test_loader):
     return accuracy
 
 train_loader, train_meta_loader, test_loader = build_dataset(args.name_dataset)
-model = build_model()
-teacher = build_model()
+model = build_model("student")
+teacher = build_model("teacher")
 
 optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=1e-4)
-optim_teacher = torch.optim.Adam(pacer.params(), args.lr, weight_decay=1e-4)
+optim_teacher = torch.optim.Adam(teacher.params(), args.lr, weight_decay=1e-4)
 
 def main():
     best_acc = 0
