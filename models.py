@@ -235,94 +235,122 @@ class LambdaLayer(MetaModule):
         return self.lambd(x)
 
 
-class BasicBlock(MetaModule):
-    expansion = 1
-
-    def __init__(self, in_planes, planes, stride=1, option='A'):
-        super(BasicBlock, self).__init__()
-        self.conv1 = MetaConv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+class Bottleneck(nn.Module):
+    expansion = 4
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
+        super(Bottleneck, self).__init__()
+        self.conv1 = MetaConv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = MetaBatchNorm2d(planes)
-        self.conv2 = MetaConv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = MetaConv2d(planes, planes, kernel_size=3, stride=stride,
+                               padding=1, bias=False)
         self.bn2 = MetaBatchNorm2d(planes)
+        self.conv3 = MetaConv2d(planes, planes * 4, kernel_size=1, bias=False)
+        self.bn3 = MetaBatchNorm2d(planes * 4)
 
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != planes:
-            if option == 'A':
-                """
-                For CIFAR10 ResNet paper uses option A.
-                """
-                self.shortcut = LambdaLayer(lambda x:
-                                            F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes//4, planes//4), "constant", 0))
-            elif option == 'B':
-                self.shortcut = nn.Sequential(
-                    MetaConv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False),
-                    MetaBatchNorm2d(self.expansion * planes)
-                )
+        self.downsample = downsample
+        self.stride = stride
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
         out = F.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = F.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+        out = F.relu(out)
+
         return out
 
 
-class ResNet32(MetaModule):
-    def __init__(self, num_classes, block=BasicBlock, num_blocks=[5, 5, 5]):
-        super(ResNet32, self).__init__()
-        self.in_planes = 16
+class ResNet(MetaModule):
+    def __init__(self, block, layers, input_channels=3):
+        self.inplanes = 64
+        super(ResNet, self).__init__()
+        self.conv0 = MetaConv2d(input_channels, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        self.bn0 = MetaBatchNorm2d(64)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
-        # encoder
-        self.conv1 = MetaConv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = MetaBatchNorm2d(16)
-        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
-        self.fc1_enc = MetaLinear(64, 64)
-        self.fc1_bn = MetaBatchNorm1d(64)
-        self.fc2_enc = MetaLinear(64, 64)
-        self.fc2_bn = MetaBatchNorm1d(64)
-        self.fc_mu = MetaLinear(64, 64)
-        self.fc_logvar = MetaLinear(64, 64)
+        self.fc1 = MetaLinear(512 * block.expansion, 1024)
+        self.bn1 = MetaBatchNorm1d(1024)
+        self.fc2 = MetaLinear(1024, 1024)
+        self.bn2 = MetaBatchNorm1d(1024)
 
-        # Linear clsf layer
-        self.fc = MetaLinear(128, num_classes)
+        self.fc_mu = MetaLinear(1024, 1024)
+        self.fc_logvar = MetaLinear(1024, 1024)
 
-        self.apply(_weights_init)
+        for m in self.modules():
+            if isinstance(m, MetaConv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, MetaBatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
-    def _make_layer(self, block, planes, num_blocks, stride):
-        strides = [stride] + [1]*(num_blocks-1)
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                MetaConv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                MetaBatchNorm2d(planes * block.expansion),
+            )
+
         layers = []
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
-            self.in_planes = planes * block.expansion
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
 
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        # encode
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = F.avg_pool2d(out, out.size()[3])
-        out = out.view(out.size(0), -1)
-        out = F.relu(self.fc1_bn(self.fc1_enc(out)))
-        out = F.relu(self.fc2_bn(self.fc2_enc(out)))
-        mu = self.fc_mu(out)
-        log_var = self.fc_logvar(out)
+        # encoder
+        x = self.conv0(x)
+        x = self.bn0(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
 
-        # linear
-        out = torch.cat((mu, log_var), -1)
-        out = self.fc(out)
-        return mu, log_var, out
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = F.avg_pool2d(x, kernel_size=7, stride=2)
+        x = x.view(x.size(0), -1)
+        
+        # mu, log_var
+        x = F.relu(self.bn1(self.fc1(x)))
+        x = F.relu(self.bn2(self.fc2(x)))
+        mu = self.fc_mu(x)
+        log_var = self.fc_logvar(x)
+
+        return mu, log_var
+
+
+def resnet50(**kwargs):
+    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+
+    return model
 
 
 class Decoder(MetaModule):
-    def __init__(self, num_classes, block=BasicBlock, num_blocks=[5, 5, 5]):
+    def __init__(self, block=Bottleneck, num_blocks=[5, 5, 5]):
         super(Decoder, self).__init__()
-        self.in_planes = 16
-
         # decoder
         self.apply(_weights_init)
 
@@ -340,7 +368,7 @@ class Decoder(MetaModule):
         
         # reparametrize
         eps = Variable(std.data.new(std.size()).normal())
-        mu_sample = eps.mul(std).add_(mu)
+        x = eps.mul(std).add_(mu)
 
         # to edit
         # decode
@@ -356,7 +384,7 @@ class Decoder(MetaModule):
         # logvar = self.fc_logvar(out)
         # std = logvar.mul(0.5).exp_()
 
-        return out
+        return x
 
 
 class Student(MetaModule):
