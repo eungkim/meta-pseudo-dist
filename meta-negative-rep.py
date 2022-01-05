@@ -19,7 +19,7 @@ import wandb
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
 parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--epochs', default=1000, type=int)
-parser.add_argument('--lr', default=1e-3, type=float)
+parser.add_argument('--lr', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
 parser.add_argument('--download', default=False, type=bool)
 
@@ -175,7 +175,7 @@ def test(model, test_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, test_loader = build_dataset(download=args.download)
+train_loader, train_meta_loader, test_loader = build_dataset()
 model = build_model("student")
 teacher = build_model("teacher")
 
