@@ -14,7 +14,7 @@ from dataset import build_dataset
 
 # args
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
-parser.add_argument('--name_dataset', default='cifar10', type=str)
+parser.add_argument('--name_dataset', default='imagenet', type=str)
 parser.add_argument('--model', default="resnet", type=str)
 parser.add_argument('--batch_size', default=64, type=int)
 parser.add_argument('--dataset', default="cifar10", type=str)
