@@ -1,4 +1,5 @@
 import argparse
+from typing import Literal
 
 import torch
 import torch.nn as nn
@@ -12,15 +13,14 @@ import numpy as np
 from models import resnet50
 from dataset import build_dataset
 
+import wandb
 
 # args
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
-parser.add_argument('--name_dataset', default='imagenet', type=str)
-parser.add_argument('--model', default="resnet", type=str)
 parser.add_argument('--batch_size', default=256, type=int)
-parser.add_argument('--dataset', default="cifar10", type=str)
-parser.add_argument('--epochs', default=500, type=int)
+parser.add_argument('--epochs', default=1000, type=int)
 parser.add_argument('--lr', default=1e-3, type=int)
+parser.add_argument('--temp', default=0.5, type=int)
 parser.add_argument('--download', default=False, type=bool)
 
 args = parser.parse_args()
@@ -34,7 +34,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # build model
 def build_model():
     model = resnet50()
-
     if torch.cuda.is_available():
         model.cuda()
         torch.backends.cudnn.benchmark = True
@@ -176,17 +175,24 @@ def test(model, test_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, test_loader = build_dataset(args.name_dataset, download=args.download)
+train_loader, train_meta_loader, test_loader = build_dataset(download=args.download)
 model = build_model("student")
 teacher = build_model("teacher")
 
-optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=1e-4)
-optim_teacher = torch.optim.Adam(teacher.params(), args.lr, weight_decay=1e-4)
+optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=1e-6)
+optim_teacher = torch.optim.Adam(teacher.params(), args.lr, weight_decay=1e-6)
 
 def main(device):
+    wandb.init(project="MetaRL", entity="ebkim")
+    wandb.config = {
+        "batch_size": args.batch_size,
+        "learning_rate": args.lr,
+        "temperature": args.temp,
+        "rep_dim": 1024
+    }
     final_acc = -1.0
     for epoch in range(args.epochs):
-        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.lr, device)
+        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.lr, args.temp, device)
         if (epoch+1)%5==0:
             print(f"Epoch: [{epoch}/{args.epochs}]\t Iters: [{i}]\t Loss: [{(train_loss/(epoch+1))}]\t MetaLoss: [{(meta_loss/(epoch+1))}]")
             train_loss = 0
@@ -195,7 +201,13 @@ def main(device):
             test_acc = test(model=model, test_loader=test_loader, device=device)
             if test_acc>=final_acc:
                 final_acc = test_acc
-        
+
+            wandb.log({
+                "train loss": train_loss,
+                "meta loss": meta_loss,
+                "accuracy": test_acc
+            })
+
     print(f"test accuracy: {final_acc}")
 
 if __name__=="__main__":
