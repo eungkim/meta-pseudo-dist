@@ -21,6 +21,7 @@ parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--dataset', default="cifar10", type=str)
 parser.add_argument('--epochs', default=500, type=int)
 parser.add_argument('--lr', default=1e-3, type=int)
+parser.add_argument('--download', default=False, type=bool)
 
 args = parser.parse_args()
 
@@ -50,7 +51,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         normalize,
     ])
 
-    for i, ((x, _), (x_meta, _)) in enumerate(zip(train_loader, train_meta_loader)):
+    for (x, _), (x_meta, _) in zip(train_loader, train_meta_loader):
             # settings
             model.train()
             x = x.to(device)
@@ -137,7 +138,7 @@ def test(model, test_loader, device):
 
     i = 0
     best_acc = -1.0
-    while i!=5:
+    while i!=3:
         for i, (x, y) in enumerate(test_loader):
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
@@ -166,6 +167,7 @@ def test(model, test_loader, device):
         
         if acc>=best_acc:
             best_acc = acc
+            i = 0
         else:
             i+=1
 
@@ -174,27 +176,27 @@ def test(model, test_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, test_loader = build_dataset(args.name_dataset)
+train_loader, train_meta_loader, test_loader = build_dataset(args.name_dataset, download=args.download)
 model = build_model("student")
 teacher = build_model("teacher")
 
 optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=1e-4)
 optim_teacher = torch.optim.Adam(teacher.params(), args.lr, weight_decay=1e-4)
 
-def main(epochs):
-    best_acc = 0
-    for epoch in range(epochs):
-        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.epochs, args.lr, device)
+def main(device):
+    final_acc = -1.0
+    for epoch in range(args.epochs):
+        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.lr, device)
         if (epoch+1)%5==0:
-            print(f"Epoch: [{epoch}/{epochs}]\t Iters: [{i}]\t Loss: [{(train_loss/(epoch+1))}]\t MetaLoss: [{(meta_loss/(epoch+1))}]")
+            print(f"Epoch: [{epoch}/{args.epochs}]\t Iters: [{i}]\t Loss: [{(train_loss/(epoch+1))}]\t MetaLoss: [{(meta_loss/(epoch+1))}]")
             train_loss = 0
             meta_loss = 0
             
             test_acc = test(model=model, test_loader=test_loader, device=device)
-            if test_acc>=best_acc:
-                best_acc = test_acc
+            if test_acc>=final_acc:
+                final_acc = test_acc
         
-    print(f"test accuracy: {best_acc}")
+    print(f"test accuracy: {final_acc}")
 
 if __name__=="__main__":
-    main(1000)
+    main()
