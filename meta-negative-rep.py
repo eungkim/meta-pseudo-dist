@@ -84,7 +84,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 
             model_meta.zero_grad()
             grads = torch.autograd.grad(loss_p, (model_meta.params()), create_graph=True)
-            model_meta.update_params(lr_inner=lr, source_params=grads) ########################lr
+            model_meta.update_params(lr_inner=scheduler_model.get_last_lr()[0], source_params=grads) ########################lr
             del grads
 
             # meta update teacher
