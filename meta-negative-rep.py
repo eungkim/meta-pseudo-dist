@@ -42,7 +42,7 @@ def build_model():
     return model
 
 # train
-def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, lr, temperature, device):
+def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, temperature, device):
     train_loss = 0
     meta_loss = 0
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -52,80 +52,82 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
     ])
 
     for (x, _), (x_meta, _) in zip(train_loader, train_meta_loader):
-            # settings
-            model.train()
-            x = x.to(device)
-            x_meta = x_meta.to(device)
+        # settings
+        model.train()
+        x = x.to(device)
+        x_meta = x_meta.to(device)
 
-            x1 = aug_transform(x)
-            x2 = aug_transform(x)
-            x_meta1 = aug_transform(x_meta)
-            x_meta2 = aug_transform(x_meta)
+        x1 = aug_transform(x)
+        x2 = aug_transform(x)
+        x_meta1 = aug_transform(x_meta)
+        x_meta2 = aug_transform(x_meta)
 
-            model_meta = build_model().cuda()
-            model_meta.load_state_dict(model.state_dict())
+        model_meta = build_model().cuda()
+        model_meta.load_state_dict(model.state_dict())
 
-            # pseudo update model_meta
-            rep1, _ = model_meta(x1)
-            rep1 = F.normalize(rep1, p=2, dim=1)
-            rep2, _ = model_meta(x2)
-            rep2 = F.normalize(rep2, p=2, dim=1)
+        # pseudo update model_meta
+        rep1, _ = model_meta(x1)
+        rep1 = F.normalize(rep1, p=2, dim=1)
+        rep2, _ = model_meta(x2)
+        rep2 = F.normalize(rep2, p=2, dim=1)
 
+        p_rep1, _ = teacher(x1)
+        p_rep2, _ = teacher(x2)
+        p_rep = torch.stack((p_rep1, p_rep2), dim=1)
+        p_rep = F.normalize(p_rep, p=2, dim=2)
+
+        loss_pos = torch.exp(torch.sum(rep1 * rep2, dim=-1) / temperature)
+        rep = torch.stack((rep1, rep2), dim=1)
+        loss_neg_matrix = torch.exp(torch.mm(rep, p_rep.t().contiguous()) / temperature)
+        loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
+        loss_p = (- torch.log(loss_pos / loss_neg)).mean()
+
+        model_meta.zero_grad()
+        grads = torch.autograd.grad(loss_p, (model_meta.params()), create_graph=True)
+        model_meta.update_params(lr_inner=scheduler_model.get_last_lr()[0], source_params=grads)
+        del grads
+
+        # meta update teacher
+        meta_rep1, _ = model_meta(x_meta1)
+        meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
+        meta_rep2, _ = model_meta(x_meta2)
+        meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
+        
+        loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
+
+        optim_teacher.zero_grad()
+        loss_meta.backward()
+        optim_teacher.step()
+
+        # update model
+        rep1, _ = model_meta(x1)
+        rep1 = F.normalize(rep1, p=2, dim=1)
+        rep2, _ = model_meta(x2)
+        rep2 = F.normalize(rep2, p=2, dim=1)
+
+        with torch.no_grad():
             p_rep1, _ = teacher(x1)
             p_rep2, _ = teacher(x2)
             p_rep = torch.stack((p_rep1, p_rep2), dim=1)
             p_rep = F.normalize(p_rep, p=2, dim=2)
 
-            loss_pos = torch.exp(torch.sum(rep1 * rep2, dim=-1) / temperature)
-            rep = torch.stack((rep1, rep2), dim=1)
-            loss_neg_matrix = torch.exp(torch.mm(rep, p_rep.t().contiguous()) / temperature)
-            loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
-            loss_p = (- torch.log(loss_pos / loss_neg)).mean()
+        loss_pos = torch.exp(torch.sum(rep1 * rep2, dim=-1) / temperature)
+        rep = torch.stack((rep1, rep2), dim=1)
+        loss_neg_matrix = torch.exp(torch.mm(rep, p_rep.t().contiguous()) / temperature)
+        loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
+        loss_p = (- torch.log(loss_pos / loss_neg)).mean()
+        
+        optim_model.zero_grad()
+        loss_p.backward()
+        optim_model.step()
 
-            model_meta.zero_grad()
-            grads = torch.autograd.grad(loss_p, (model_meta.params()), create_graph=True)
-            model_meta.update_params(lr_inner=scheduler_model.get_last_lr()[0], source_params=grads) ########################lr
-            del grads
+        # print loss
+        train_loss += loss_p.item()
+        meta_loss += loss_meta.item()
 
-            # meta update teacher
-            meta_rep1, _ = model_meta(x_meta1)
-            meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
-            meta_rep2, _ = model_meta(x_meta2)
-            meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
-            
-            loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
+    iter_num = len(train_loader.dataset)
 
-            optim_teacher.zero_grad()
-            loss_meta.backward()
-            optim_teacher.step()
-
-            # update model
-            rep1, _ = model_meta(x1)
-            rep1 = F.normalize(rep1, p=2, dim=1)
-            rep2, _ = model_meta(x2)
-            rep2 = F.normalize(rep2, p=2, dim=1)
-
-            with torch.no_grad():
-                p_rep1, _ = teacher(x1)
-                p_rep2, _ = teacher(x2)
-                p_rep = torch.stack((p_rep1, p_rep2), dim=1)
-                p_rep = F.normalize(p_rep, p=2, dim=2)
-
-            loss_pos = torch.exp(torch.sum(rep1 * rep2, dim=-1) / temperature)
-            rep = torch.stack((rep1, rep2), dim=1)
-            loss_neg_matrix = torch.exp(torch.mm(rep, p_rep.t().contiguous()) / temperature)
-            loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
-            loss_p = (- torch.log(loss_pos / loss_neg)).mean()
-            
-            optim_model.zero_grad()
-            loss_p.backward()
-            optim_model.step()
-
-            # print loss
-            train_loss += loss_p.item()
-            meta_loss += loss_meta.item()
-
-    return train_loss, meta_loss
+    return train_loss/iter_num, meta_loss/iter_num
 
 
 def test(model, test_loader, device):
@@ -139,7 +141,7 @@ def test(model, test_loader, device):
     i = 0
     best_acc = -1.0
     while i!=3:
-        for i, (x, y) in enumerate(test_loader):
+        for x, y in test_loader:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
                 rep, _ = model(x)
@@ -154,7 +156,7 @@ def test(model, test_loader, device):
         correct = 0
 
         with torch.no_grad():
-            for i, (x, y) in enumerate(test_loader):
+            for x, y in test_loader:
                 x, y = x.to(device), y.to(device)
                 rep, _ = model(x)
                 rep = F.normalize(rep, p=2, dim=1)
@@ -196,28 +198,31 @@ def main(device):
         "rep_dim": 1024
     }
     best_train_acc = -1.0
+    best_valid_acc = -1.0
     for epoch in range(args.epochs):
-        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.lr, args.temp, device)
+        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.temp, device)
         scheduler_model.step()
         scheduler_teacher.step()
-        if (epoch+1)%5==0:
-            print(f"Epoch: [{epoch}/{args.epochs}]\t Iters: [{i}]\t Loss: [{(train_loss/(epoch+1))}]\t MetaLoss: [{(meta_loss/(epoch+1))}]")
-            train_loss = 0
-            meta_loss = 0
-            
-            train_acc = test(model=model, test_loader=train_acc_loader, device=device)
-            if train_acc>=final_acc:
-                final_acc = train_acc 
-                ###############torch model save
+        # if (epoch+1)%5==0:
+        print(f"Epoch: [{epoch}/{args.epochs}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
+        
+        train_acc = test(model=model, test_loader=train_acc_loader, device=device)
+        if train_acc>=best_train_acc:
+            best_train_acc = train_acc 
+        
+        valid_acc = test(model=model, test_loader=test_loader, device=device)
+        if valid_acc>=best_valid_acc:
+            best_valid_acc = valid_acc
+            torch.save(model.state_dict(), f"saved_models/epoch{epoch}.pth")
 
-            wandb.log({
-                "train loss": train_loss,
-                "meta loss": meta_loss,
-                "train accuracy": train_acc, 
-                "test accuracy": final_acc
-            })
+        wandb.log({
+            "train loss": train_loss,
+            "meta loss": meta_loss,
+            "train accuracy": train_acc, 
+            "test accuracy": valid_acc 
+        })
 
-    print(f"test accuracy: {final_acc}")
+    print(f"test accuracy: {best_valid_acc}")
 
 if __name__=="__main__":
     main()
