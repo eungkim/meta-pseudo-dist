@@ -17,9 +17,10 @@ import wandb
 
 # args
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
-parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--epochs', default=1000, type=int)
-parser.add_argument('--lr', default=1e-4, type=float)
+parser.add_argument('--batch_size', default=256, type=int)
+parser.add_argument('--lr', default=5e-2, type=float)
+parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
 parser.add_argument('--download', default=False, type=bool)
 
@@ -83,7 +84,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 
             model_meta.zero_grad()
             grads = torch.autograd.grad(loss_p, (model_meta.params()), create_graph=True)
-            model_meta.update_params(lr_inner=lr, source_params=grads)
+            model_meta.update_params(lr_inner=lr, source_params=grads) ########################lr
             del grads
 
             # meta update teacher
@@ -132,7 +133,7 @@ def test(model, test_loader, device):
     model.eval()
     linear = nn.Linear(1024,1000)
 
-    optimizer = optim.Adam(linear, lr=1e-3, weight_decay=1e-6)
+    optimizer = optim.Adam(linear, lr=1e-3, weight_decay=args.w_decay)
     criterion = nn.CrossEntropyLoss().to(device)
 
     i = 0
@@ -175,37 +176,45 @@ def test(model, test_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, test_loader = build_dataset()
+train_loader, train_meta_loader, train_acc_loader, test_loader = build_dataset(batch_size=args.batch_size)
 model = build_model("student")
 teacher = build_model("teacher")
 
-optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=1e-6)
-optim_teacher = torch.optim.Adam(teacher.params(), args.lr, weight_decay=1e-6)
+optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
+optim_teacher = torch.optim.SGD(teacher.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
+scheduler_model = torch.optim.lr_scheduler.CosineAnnealingLR(optim_model, T_max=args.epochs, eta_min=0)
+scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
 
 def main(device):
     wandb.init(project="MetaRL", entity="ebkim")
     wandb.config = {
+        "epochs": args.epochs,
         "batch_size": args.batch_size,
         "learning_rate": args.lr,
+        "weight_decay": args.w_decay,
         "temperature": args.temp,
         "rep_dim": 1024
     }
-    final_acc = -1.0
+    best_train_acc = -1.0
     for epoch in range(args.epochs):
         train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.lr, args.temp, device)
+        scheduler_model.step()
+        scheduler_teacher.step()
         if (epoch+1)%5==0:
             print(f"Epoch: [{epoch}/{args.epochs}]\t Iters: [{i}]\t Loss: [{(train_loss/(epoch+1))}]\t MetaLoss: [{(meta_loss/(epoch+1))}]")
             train_loss = 0
             meta_loss = 0
             
-            test_acc = test(model=model, test_loader=test_loader, device=device)
-            if test_acc>=final_acc:
-                final_acc = test_acc
+            train_acc = test(model=model, test_loader=train_acc_loader, device=device)
+            if train_acc>=final_acc:
+                final_acc = train_acc 
+                ###############torch model save
 
             wandb.log({
                 "train loss": train_loss,
                 "meta loss": meta_loss,
-                "accuracy": test_acc
+                "train accuracy": train_acc, 
+                "test accuracy": final_acc
             })
 
     print(f"test accuracy: {final_acc}")
