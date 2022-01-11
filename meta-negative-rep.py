@@ -173,8 +173,6 @@ def test(model, valid_loader, device):
         else:
             i+=1
 
-    print(f"Linear Accuracy: {best_acc}")
-
     return best_acc
 
 
@@ -207,10 +205,12 @@ def main(device):
         print(f"Epoch: [{epoch}/{args.epochs}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
         
         train_acc = test(model=model, valid_loader=train_acc_loader, device=device)
+        print(f"Epoch: [{epoch}/{args.epochs}]\t Train Accuracy: [{train_acc}]")
         if train_acc>=best_train_acc:
             best_train_acc = train_acc 
         
         valid_acc = test(model=model, valid_loader=valid_loader, device=device)
+        print(f"Epoch: [{epoch}/{args.epochs}]\t Valid Accuracy: [{valid_acc}]")
         if valid_acc>=best_valid_acc:
             best_valid_acc = valid_acc
             torch.save(model.state_dict(), f"saved_models/epoch{epoch}.pth")
@@ -222,7 +222,7 @@ def main(device):
             "test accuracy": valid_acc 
         })
 
-    print(f"test accuracy: {best_valid_acc}")
+    print(f"Best Valid Accuracy: {best_valid_acc}")
 
 if __name__=="__main__":
     main()
