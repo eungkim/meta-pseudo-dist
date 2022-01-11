@@ -23,6 +23,7 @@ parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
 parser.add_argument('--download', default=False, type=bool)
+parser.add_argument('--path', default="/home/", type=str)
 
 args = parser.parse_args()
 
@@ -178,7 +179,7 @@ def test(model, test_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, train_acc_loader, test_loader = build_dataset(batch_size=args.batch_size)
+train_loader, train_meta_loader, train_acc_loader, test_loader = build_dataset(batch_size=args.batch_size, path=args.path)
 model = build_model("student")
 teacher = build_model("teacher")
 
