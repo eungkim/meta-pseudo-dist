@@ -131,7 +131,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
     return train_loss/iter_num, meta_loss/iter_num
 
 
-def test(model, test_loader, device):
+def test(model, valid_loader, device):
     # to edit
     model.eval()
     linear = nn.Linear(1024,1000)
@@ -142,7 +142,7 @@ def test(model, test_loader, device):
     i = 0
     best_acc = -1.0
     while i!=3:
-        for x, y in test_loader:
+        for x, y in valid_loader:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
                 rep, _ = model(x)
@@ -157,7 +157,7 @@ def test(model, test_loader, device):
         correct = 0
 
         with torch.no_grad():
-            for x, y in test_loader:
+            for x, y in valid_loader:
                 x, y = x.to(device), y.to(device)
                 rep, _ = model(x)
                 rep = F.normalize(rep, p=2, dim=1)
@@ -166,7 +166,7 @@ def test(model, test_loader, device):
                 predicted = y_est.max(1)
                 correct+=predicted.eq(y).sum().item()
         
-            acc = 100. * correct / len(test_loader.dataset)
+            acc = 100. * correct / len(valid_loader.dataset)
         
         if acc>=best_acc:
             best_acc = acc
@@ -179,7 +179,7 @@ def test(model, test_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, train_acc_loader, test_loader = build_dataset(batch_size=args.batch_size, path=args.path)
+train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, path=args.path)
 model = build_model("student")
 teacher = build_model("teacher")
 
@@ -207,11 +207,11 @@ def main(device):
         # if (epoch+1)%5==0:
         print(f"Epoch: [{epoch}/{args.epochs}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
         
-        train_acc = test(model=model, test_loader=train_acc_loader, device=device)
+        train_acc = test(model=model, valid_loader=train_acc_loader, device=device)
         if train_acc>=best_train_acc:
             best_train_acc = train_acc 
         
-        valid_acc = test(model=model, test_loader=test_loader, device=device)
+        valid_acc = test(model=model, valid_loader=valid_loader, device=device)
         if valid_acc>=best_valid_acc:
             best_valid_acc = valid_acc
             torch.save(model.state_dict(), f"saved_models/epoch{epoch}.pth")
