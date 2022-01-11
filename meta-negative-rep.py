@@ -22,7 +22,6 @@ parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
-parser.add_argument('--download', default=False, type=bool)
 parser.add_argument('--path', default="/home/", type=str)
 
 args = parser.parse_args()
