@@ -226,4 +226,4 @@ def main(device):
     print(f"Best Valid Accuracy: {best_valid_acc}")
 
 if __name__=="__main__":
-    main()
+    main(device)
