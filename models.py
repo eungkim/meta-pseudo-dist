@@ -70,13 +70,13 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
-        self.fc1 = nn.Linear(512 * block.expansion, 1024)
-        self.bn1 = nn.BatchNorm1d(1024)
-        self.fc2 = nn.Linear(1024, 1024)
-        self.bn2 = nn.BatchNorm1d(1024)
+        self.fc1 = nn.Linear(512 * block.expansion, 256)
+        self.bn1 = nn.BatchNorm1d(256)
+        # self.fc2 = nn.Linear(1024, 1024)
+        # self.bn2 = nn.BatchNorm1d(1024)
 
-        self.fc_mu = nn.Linear(1024, 1024)
-        self.fc_logvar = nn.Linear(1024, 1024)
+        self.fc_mu = nn.Linear(256, 256)
+        # self.fc_logvar = nn.Linear(1024, 1024)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -120,11 +120,12 @@ class ResNet(nn.Module):
         
         # mu, log_var
         x = F.relu(self.bn1(self.fc1(x)))
-        x = F.relu(self.bn2(self.fc2(x)))
+        # x = F.relu(self.bn2(self.fc2(x)))
         mu = self.fc_mu(x)
-        log_var = self.fc_logvar(x)
+        # log_var = self.fc_logvar(x)
 
-        return mu, log_var
+        # return mu, log_var
+        return mu, 0
 
 
 def resnet50(**kwargs):

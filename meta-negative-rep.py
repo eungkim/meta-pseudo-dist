@@ -31,7 +31,7 @@ args = parser.parse_args()
 
 # torch settings
 torch.manual_seed(816)
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1, 2, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"device: {device}")
 
@@ -79,6 +79,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         p_optim_model.meta_step(grads)
 
         del grads
+        print("breakpoint1")
 
         x_meta1 = x_meta1.to(device)
         x_meta2 = x_meta2.to(device)
@@ -89,10 +90,12 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
         loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
+        print("breakpoint2")
 
         optim_teacher.zero_grad()
         loss_meta.backward()
         optim_teacher.step()
+        print("breakpoint3")
 
         # update model
         rep1, _ = model(x1)
