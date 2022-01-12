@@ -47,7 +47,10 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
+        # p_model = resnet50().to(device)
         p_model = resnet50().to(device)
+        p_model = nn.DataParallel(p_model)
+        p_model.cuda()
         p_model.load_state_dict(model.state_dict())
         p_model.train()
 
@@ -167,8 +170,14 @@ def test(model, valid_loader, device):
 
 
 train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, path=args.path)
+
 model = resnet50()
+model = nn.DataParallel(model)
+model.cuda()
+
 teacher = resnet50()
+teacher = nn.DataParallel(teacher)
+teacher.cuda()
 
 optim_model = torch.optim.SGD(model.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
 optim_teacher = torch.optim.SGD(teacher.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
