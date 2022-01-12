@@ -125,7 +125,7 @@ class ResNet(nn.Module):
         # log_var = self.fc_logvar(x)
 
         # return mu, log_var
-        return mu, 0
+        return mu, False
 
 
 def resnet50(**kwargs):
