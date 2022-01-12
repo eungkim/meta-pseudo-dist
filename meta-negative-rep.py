@@ -68,7 +68,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
         loss_p = (- torch.log(loss_pos / loss_neg)).mean()
 
-        grads = torch.autograd.grad(loss_p, (p_model.params()), create_graph=True)
+        grads = torch.autograd.grad(loss_p, (p_model.parameters()), create_graph=True)
         p_optim_model = MetaSGD(p_model, p_model.parameters(), lr=scheduler_model.get_last_lr()[0], create_graph=True)
         p_optim_model.load_state_dict(optim_model.state_dict())
         p_optim_model.meta_step(grads)
@@ -170,8 +170,8 @@ train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(
 model = resnet50()
 teacher = resnet50()
 
-optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
-optim_teacher = torch.optim.SGD(teacher.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
+optim_model = torch.optim.SGD(model.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
+optim_teacher = torch.optim.SGD(teacher.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
 scheduler_model = torch.optim.lr_scheduler.CosineAnnealingLR(optim_model, T_max=args.epochs, eta_min=0)
 scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
 
