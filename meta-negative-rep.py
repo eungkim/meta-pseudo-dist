@@ -31,7 +31,7 @@ args = parser.parse_args()
 
 # torch settings
 torch.manual_seed(816)
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1, 2, 3'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"device: {device}")
 
@@ -49,10 +49,9 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
-        # p_model = resnet50().to(device)
-        p_model = resnet50().to(device)
+        p_model = resnet50()
         p_model = nn.DataParallel(p_model)
-        p_model.cuda()
+        p_model = p_model.to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
 
@@ -81,7 +80,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         del grads
         print("breakpoint1")
 
-        x_meta1 = x_meta1.to(device)
+        x_meta1 = x_meta1.cuda()
         x_meta2 = x_meta2.to(device)
         # meta update teacher
         meta_rep1 = p_model(x_meta1)
@@ -178,11 +177,11 @@ train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(
 
 model = resnet50()
 model = nn.DataParallel(model)
-model.cuda()
+model = model.to(device)
 
 teacher = resnet50()
 teacher = nn.DataParallel(teacher)
-teacher.cuda()
+teacher = teacher.to(device)
 
 optim_model = torch.optim.SGD(model.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
 optim_teacher = torch.optim.SGD(teacher.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
