@@ -69,6 +69,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 
         loss_pos = torch.exp(torch.sum(rep1 * rep2, dim=-1) / temperature)
         rep = torch.stack((rep1, rep2), dim=1)
+        print(f"p_rep{p_rep.size()} rep{rep.size}")
         loss_neg_matrix = torch.exp(torch.mm(rep, p_rep) / temperature)
         loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
         loss_p = (- torch.log(loss_pos / loss_neg)).mean()
