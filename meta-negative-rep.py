@@ -50,8 +50,10 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
     for (x1, x2), (x_meta1, x_meta2) in zip(train_loader, train_meta_loader):
         # settings
         model.train()
-        x = x.to(device)
-        x_meta = x_meta.to(device)
+        x1 = x1.to(device)
+        x2 = x2.to(device)
+        x_meta1 = x_meta1.to(device)
+        x_meta2 = x_meta2.to(device)
 
         model_meta = build_model().cuda()
         model_meta.load_state_dict(model.state_dict())
