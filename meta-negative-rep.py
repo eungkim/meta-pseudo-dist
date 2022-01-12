@@ -57,13 +57,13 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         p_model.train()
 
         # pseudo update model_meta
-        rep1, _ = p_model(x1)
+        rep1 = p_model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2, _ = p_model(x2)
+        rep2 = p_model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
-        p_rep1, _ = teacher(x1)
-        p_rep2, _ = teacher(x2)
+        p_rep1 = teacher(x1)
+        p_rep2 = teacher(x2)
         p_rep = torch.stack((p_rep1, p_rep2), dim=2)
         p_rep = F.normalize(p_rep, p=2, dim=1)
 
@@ -84,9 +84,9 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x_meta1 = x_meta1.to(device)
         x_meta2 = x_meta2.to(device)
         # meta update teacher
-        meta_rep1, _ = p_model(x_meta1)
+        meta_rep1 = p_model(x_meta1)
         meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
-        meta_rep2, _ = p_model(x_meta2)
+        meta_rep2 = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
         loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
@@ -98,14 +98,14 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         print("breakpoint3")
 
         # update model
-        rep1, _ = model(x1)
+        rep1 = model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2, _ = model(x2)
+        rep2 = model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         with torch.no_grad():
-            p_rep1, _ = teacher(x1)
-            p_rep2, _ = teacher(x2)
+            p_rep1 = teacher(x1)
+            p_rep2 = teacher(x2)
             p_rep = torch.stack((p_rep1, p_rep2), dim=1)
             p_rep = F.normalize(p_rep, p=2, dim=2)
 
