@@ -178,8 +178,8 @@ def test(model, valid_loader, device):
 
 
 train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, path=args.path)
-model = build_model("student")
-teacher = build_model("teacher")
+model = build_model()
+teacher = build_model()
 
 optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
 optim_teacher = torch.optim.SGD(teacher.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
