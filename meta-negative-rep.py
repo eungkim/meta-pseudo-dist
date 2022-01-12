@@ -1,5 +1,6 @@
 import argparse
 from typing import Literal
+from meta import MetaSGD
 
 import torch
 import torch.nn as nn
@@ -14,6 +15,7 @@ from models import resnet50
 from dataset import build_dataset
 
 import wandb
+
 
 # args
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
@@ -33,14 +35,6 @@ print(f"device: {device}")
 
 # modification of https://github.com/xjtushujun/meta-weight-net
 
-# build model
-def build_model():
-    model = resnet50()
-    if torch.cuda.is_available():
-        model.cuda()
-        torch.backends.cudnn.benchmark = True
-    
-    return model
 
 # train
 def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, temperature, device):
@@ -52,16 +46,15 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         model.train()
         x1 = x1.to(device)
         x2 = x2.to(device)
-        x_meta1 = x_meta1.to(device)
-        x_meta2 = x_meta2.to(device)
 
-        model_meta = build_model().cuda()
-        model_meta.load_state_dict(model.state_dict())
+        p_model = resnet50.to(device)
+        p_model.load_state_dict(model.state_dict())
+        p_model.train()
 
         # pseudo update model_meta
-        rep1, _ = model_meta(x1)
+        rep1, _ = p_model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2, _ = model_meta(x2)
+        rep2, _ = p_model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         p_rep1, _ = teacher(x1)
@@ -75,15 +68,19 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
         loss_p = (- torch.log(loss_pos / loss_neg)).mean()
 
-        model_meta.zero_grad()
-        grads = torch.autograd.grad(loss_p, (model_meta.params()), create_graph=True)
-        model_meta.update_params(lr_inner=scheduler_model.get_last_lr()[0], source_params=grads)
+        grads = torch.autograd.grad(loss_p, (p_model.params()), create_graph=True)
+        p_optim_model = MetaSGD(p_model, p_model.parameters(), lr=scheduler_model.get_last_lr()[0], create_graph=True)
+        p_optim_model.load_state_dict(optim_model.state_dict())
+        p_optim_model.meta_step(grads)
+
         del grads
 
+        x_meta1 = x_meta1.to(device)
+        x_meta2 = x_meta2.to(device)
         # meta update teacher
-        meta_rep1, _ = model_meta(x_meta1)
+        meta_rep1, _ = p_model(x_meta1)
         meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
-        meta_rep2, _ = model_meta(x_meta2)
+        meta_rep2, _ = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
         loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
@@ -93,9 +90,9 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         optim_teacher.step()
 
         # update model
-        rep1, _ = model_meta(x1)
+        rep1, _ = model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2, _ = model_meta(x2)
+        rep2, _ = model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         with torch.no_grad():
@@ -170,13 +167,14 @@ def test(model, valid_loader, device):
 
 
 train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, path=args.path)
-model = build_model()
-teacher = build_model()
+model = resnet50()
+teacher = resnet50()
 
 optim_model = torch.optim.SGD(model.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
 optim_teacher = torch.optim.SGD(teacher.params(), args.lr, momentum=0.9, weight_decay=args.w_decay)
 scheduler_model = torch.optim.lr_scheduler.CosineAnnealingLR(optim_model, T_max=args.epochs, eta_min=0)
 scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
+
 
 def main(device):
     wandb.init(project="MetaRL", entity="ebkim")
@@ -188,6 +186,7 @@ def main(device):
         "temperature": args.temp,
         "rep_dim": 1024
     }
+
     best_train_acc = -1.0
     best_valid_acc = -1.0
     for epoch in range(args.epochs):

@@ -24,10 +24,10 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
     train_acc_dataset = AugImageNet(path, split='train', transform=train_transform)
     valid_dataset = datasets.ImageNet(path, split='val', transform=valid_transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    train_meta_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    train_acc_loader = DataLoader(train_acc_dataset, batch_size=batch_size, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    train_meta_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    train_acc_loader = DataLoader(train_acc_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
     return train_loader, train_meta_loader, train_acc_loader, valid_loader 
 
