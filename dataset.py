@@ -12,17 +12,16 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
     train_transform = transforms.Compose([
             transforms.RandomResizedCrop(256),
             transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
+    ])
     valid_transform = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
-        ])
+    ])
     
-    train_dataset = datasets.ImageNet(path, split='train', transform=train_transform)
-    train_acc_dataset = datasets.ImageNet(path, split='train', transform=valid_transform)
+    train_dataset = BiAugImageNet(path, split='train', transform=train_transform)
+    train_acc_dataset = AugImageNet(path, split='train', transform=train_transform)
     valid_dataset = datasets.ImageNet(path, split='val', transform=valid_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -31,3 +30,29 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True)
 
     return train_loader, train_meta_loader, train_acc_loader, valid_loader 
+
+
+normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+aug_transform = transforms.Compose([
+        transforms.RandomCrop(224),
+        transforms.ToTensor(),
+        normalize,
+])
+class BiAugImageNet(datasets.ImageNet):
+    def __getitem__(self, index):
+        path, _ = self.samples[index]
+        sample = self.loader(path)
+        img = self.transform(sample)
+        img1 = aug_transform(img)
+        img2 = aug_transform(img)
+
+        return img1, img2
+        
+class AugImageNet(datasets.ImageNet):
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        img = self.transform(sample)
+        img = aug_transform(img)
+
+        return img, target

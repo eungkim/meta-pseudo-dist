@@ -46,24 +46,12 @@ def build_model():
 def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, temperature, device):
     train_loss = 0
     meta_loss = 0
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    aug_transform = transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.RandomCrop(224),
-        transforms.ToTensor(),
-        normalize,
-    ])
 
-    for (x, _), (x_meta, _) in zip(train_loader, train_meta_loader):
+    for (x1, x2), (x_meta1, x_meta2) in zip(train_loader, train_meta_loader):
         # settings
         model.train()
         x = x.to(device)
         x_meta = x_meta.to(device)
-
-        x1 = aug_transform(x)
-        x2 = aug_transform(x)
-        x_meta1 = aug_transform(x_meta)
-        x_meta2 = aug_transform(x_meta)
 
         model_meta = build_model().cuda()
         model_meta.load_state_dict(model.state_dict())
