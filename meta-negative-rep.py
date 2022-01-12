@@ -79,7 +79,6 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         p_optim_model.meta_step(grads)
 
         del grads
-        print("breakpoint1")
 
         x_meta1 = x_meta1.cuda()
         x_meta2 = x_meta2.to(device)
