@@ -12,7 +12,6 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
     train_transform = transforms.Compose([
             transforms.RandomResizedCrop(256),
             transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
         ])
     valid_transform = transforms.Compose([
             transforms.Resize(256),

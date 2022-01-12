@@ -49,6 +49,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     aug_transform = transforms.Compose([
         transforms.RandomCrop(224),
+        transforms.ToTensor(),
         normalize,
     ])
 
