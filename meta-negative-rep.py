@@ -47,7 +47,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
-        p_model = resnet50.to(device)
+        p_model = resnet50().to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
 
