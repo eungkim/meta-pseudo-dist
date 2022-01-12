@@ -12,6 +12,7 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
     train_transform = transforms.Compose([
             transforms.RandomResizedCrop(256),
             transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
         ])
     valid_transform = transforms.Compose([
             transforms.Resize(256),
@@ -26,7 +27,7 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     train_meta_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    train_acc_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_acc_loader = DataLoader(train_acc_dataset, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, train_meta_loader, train_acc_loader, valid_loader 
