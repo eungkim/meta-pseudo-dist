@@ -88,12 +88,10 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
         loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
-        print("breakpoint2")
 
         optim_teacher.zero_grad()
         loss_meta.backward()
         optim_teacher.step()
-        print("breakpoint3")
 
         # update model
         rep1, code1 = model(x1)
@@ -104,12 +102,12 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         with torch.no_grad():
             p_rep1 = teacher(code1.detach())
             p_rep2 = teacher(code2.detach())
-            p_rep = torch.stack((p_rep1, p_rep2), dim=1)
-            p_rep = F.normalize(p_rep, p=2, dim=2)
+            p_rep = torch.stack((p_rep1, p_rep2), dim=2)
+            p_rep = F.normalize(p_rep, p=2, dim=1)
 
         loss_pos = torch.exp(torch.sum(rep1 * rep2, dim=-1) / temperature)
         rep = torch.stack((rep1, rep2), dim=1)
-        loss_neg_matrix = torch.exp(torch.mm(rep, p_rep.t().contiguous()) / temperature)
+        loss_neg_matrix = torch.exp(torch.matmul(rep, p_rep) / temperature)
         loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
         loss_p = (- torch.log(loss_pos / loss_neg)).mean()
         
