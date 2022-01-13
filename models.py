@@ -180,7 +180,7 @@ def resnet18(**kwargs):
 class Teacher(nn.Module):
     def __init__(self):
         super(Teacher, self).__init__()
-        expansion = 4
+        expansion = 1
         self.fc1 = nn.Linear(512 * expansion, 128)
         self.bn1 = nn.BatchNorm1d(128)
         self.fc2 = nn.Linear(128, 128)
