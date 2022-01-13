@@ -12,7 +12,7 @@ import torch.utils.data
 from torch.autograd import Variable
 import numpy as np
 
-from models import resnet50, Teacher
+from models import resnet18, resnet50, Teacher
 from dataset import build_dataset
 
 import wandb
@@ -49,7 +49,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
-        p_model = resnet50()
+        p_model = resnet18()
         p_model = p_model.to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
@@ -183,7 +183,7 @@ def main(device):
     best_train_acc = -1.0
     best_valid_acc = -1.0
 
-    model = resnet50()
+    model = resnet18()
     model = model.to(device)
 
     teacher = Teacher()
