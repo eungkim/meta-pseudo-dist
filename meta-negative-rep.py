@@ -39,7 +39,7 @@ print(f"device: {device}")
 
 
 # train
-def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, p_lr, temperature):
+def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, p_lr, temperature, device):
     train_loss = 0
     meta_loss = 0
 
