@@ -172,7 +172,7 @@ def test(model, valid_loader, device):
     return best_acc
 
 
-def main():
+def main(device):
     wandb.init(project="MetaRL", entity="ebkim")
     wandb.config = {
         "epochs": args.epochs,
