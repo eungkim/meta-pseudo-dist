@@ -70,12 +70,12 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
-        self.fc1 = nn.Linear(512 * block.expansion, 256)
-        self.bn1 = nn.BatchNorm1d(256)
+        self.fc1 = nn.Linear(512 * block.expansion, 128)
+        self.bn1 = nn.BatchNorm1d(128)
         # self.fc2 = nn.Linear(1024, 1024)
         # self.bn2 = nn.BatchNorm1d(1024)
 
-        self.fc_mu = nn.Linear(256, 256)
+        self.fc_mu = nn.Linear(128, 128)
         # self.fc_logvar = nn.Linear(1024, 1024)
 
         for m in self.modules():
@@ -138,9 +138,9 @@ class Teacher(nn.Module):
     def __init__(self):
         super(Teacher, self).__init__()
         expansion = 4
-        self.fc1 = nn.Linear(512 * expansion, 256)
-        self.bn1 = nn.BatchNorm1d(256)
-        self.fc2 = nn.Linear(256, 256)
+        self.fc1 = nn.Linear(512 * expansion, 128)
+        self.bn1 = nn.BatchNorm1d(128)
+        self.fc2 = nn.Linear(128, 128)
 
     def forward(self, x):
         x = F.relu(self.bn1(self.fc1(x)))
