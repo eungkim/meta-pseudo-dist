@@ -12,7 +12,7 @@ import torch.utils.data
 from torch.autograd import Variable
 import numpy as np
 
-from models import resnet50
+from models import resnet50, Teacher
 from dataset import build_dataset
 
 import wandb
@@ -31,7 +31,7 @@ args = parser.parse_args()
 
 # torch settings
 torch.manual_seed(816)
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1, 2, 3'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"device: {device}")
 
@@ -39,7 +39,7 @@ print(f"device: {device}")
 
 
 # train
-def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, temperature, device):
+def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, p_lr, temperature):
     train_loss = 0
     meta_loss = 0
 
@@ -50,19 +50,18 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x2 = x2.to(device)
 
         p_model = resnet50()
-        p_model = nn.DataParallel(p_model)
         p_model = p_model.to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
 
         # pseudo update model_meta
-        rep1 = p_model(x1)
+        rep1, code1 = p_model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2 = p_model(x2)
+        rep2, code2 = p_model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
-        p_rep1 = teacher(x1)
-        p_rep2 = teacher(x2)
+        p_rep1 = teacher(code1.detach())
+        p_rep2 = teacher(code2.detach())
         p_rep = torch.stack((p_rep1, p_rep2), dim=2)
         p_rep = F.normalize(p_rep, p=2, dim=1)
 
@@ -74,18 +73,18 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 
         grads = torch.autograd.grad(loss_p, (p_model.parameters()), create_graph=True)
 
-        p_optim_model = MetaSGD(p_model, p_model.parameters(), lr=scheduler_model.get_last_lr()[0])
+        p_optim_model = MetaSGD(p_model, p_model.parameters(), lr=p_lr)
         p_optim_model.load_state_dict(optim_model.state_dict())
         p_optim_model.meta_step(grads)
 
         del grads
 
-        x_meta1 = x_meta1.cuda()
+        x_meta1 = x_meta1.to(device)
         x_meta2 = x_meta2.to(device)
         # meta update teacher
-        meta_rep1 = p_model(x_meta1)
+        meta_rep1, _ = p_model(x_meta1)
         meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
-        meta_rep2 = p_model(x_meta2)
+        meta_rep2, _ = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
         loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
@@ -97,14 +96,14 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         print("breakpoint3")
 
         # update model
-        rep1 = model(x1)
+        rep1, code1 = model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2 = model(x2)
+        rep2, code2 = model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         with torch.no_grad():
-            p_rep1 = teacher(x1)
-            p_rep2 = teacher(x2)
+            p_rep1 = teacher(code1.detach())
+            p_rep2 = teacher(code2.detach())
             p_rep = torch.stack((p_rep1, p_rep2), dim=1)
             p_rep = F.normalize(p_rep, p=2, dim=2)
 
@@ -173,23 +172,7 @@ def test(model, valid_loader, device):
     return best_acc
 
 
-train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, path=args.path)
-
-model = resnet50()
-model = nn.DataParallel(model)
-model = model.to(device)
-
-teacher = resnet50()
-teacher = nn.DataParallel(teacher)
-teacher = teacher.to(device)
-
-optim_model = torch.optim.SGD(model.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
-optim_teacher = torch.optim.SGD(teacher.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
-scheduler_model = torch.optim.lr_scheduler.CosineAnnealingLR(optim_model, T_max=args.epochs, eta_min=0)
-scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
-
-
-def main(device):
+def main():
     wandb.init(project="MetaRL", entity="ebkim")
     wandb.config = {
         "epochs": args.epochs,
@@ -199,11 +182,24 @@ def main(device):
         "temperature": args.temp,
         "rep_dim": 1024
     }
-
     best_train_acc = -1.0
     best_valid_acc = -1.0
+
+    model = resnet50()
+    model = model.to(device)
+
+    teacher = Teacher()
+    teacher = teacher.to(device)
+
+    train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, num_worker=4, path=args.path)
+
+    optim_model = torch.optim.SGD(model.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
+    optim_teacher = torch.optim.SGD(teacher.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
+    scheduler_model = torch.optim.lr_scheduler.CosineAnnealingLR(optim_model, T_max=args.epochs, eta_min=0)
+    scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
+
     for epoch in range(args.epochs):
-        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, args.temp, device)
+        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, scheduler_model.get_last_lr()[0], args.temp, device)
         scheduler_model.step()
         scheduler_teacher.step()
         # if (epoch+1)%5==0:

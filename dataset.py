@@ -7,7 +7,7 @@ import random
 import numpy as np
 
 
-def build_dataset(batch_size=256, path="data/ImageNet/"):
+def build_dataset(batch_size=256, num_worker=4, path="data/ImageNet/"):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     train_transform = transforms.Compose([
             transforms.RandomResizedCrop(256),
@@ -24,10 +24,10 @@ def build_dataset(batch_size=256, path="data/ImageNet/"):
     train_acc_dataset = AugImageNet(path, split='train', transform=train_transform)
     valid_dataset = datasets.ImageNet(path, split='val', transform=valid_transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-    train_meta_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-    train_acc_loader = DataLoader(train_acc_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_worker)
+    train_meta_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_worker)
+    train_acc_loader = DataLoader(train_acc_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_worker)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_worker)
 
     return train_loader, train_meta_loader, train_acc_loader, valid_loader 
 

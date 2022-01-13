@@ -119,19 +119,34 @@ class ResNet(nn.Module):
         x = x.view(x.size(0), -1)
         
         # mu, log_var
-        x = F.relu(self.bn1(self.fc1(x)))
+        mu = F.relu(self.bn1(self.fc1(x)))
         # x = F.relu(self.bn2(self.fc2(x)))
-        mu = self.fc_mu(x)
+        mu = self.fc_mu(mu)
         # log_var = self.fc_logvar(x)
 
         # return mu, log_var
-        return mu
+        return mu, x
 
 
 def resnet50(**kwargs):
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
 
     return model
+
+
+class Teacher(nn.Module):
+    def __init__(self):
+        super(Teacher, self).__init__()
+        expansion = 4
+        self.fc1 = nn.Linear(512 * expansion, 256)
+        self.bn1 = nn.BatchNorm1d(256)
+        self.fc2 = nn.Linear(256, 256)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.fc1(x)))
+        x = self.fc2(x)
+
+        return x
 
 
 class Decoder(nn.Module):
