@@ -12,7 +12,8 @@ import torch.utils.data
 from torch.autograd import Variable
 import numpy as np
 
-from models import resnet18, resnet50, Teacher
+from models.models_imagenet import resnet18, resnet50, Teacher
+from models.models_cifar10 import resnet32
 from dataset import build_dataset
 
 import wandb
@@ -20,6 +21,7 @@ import wandb
 
 # args
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
+parser.add_argument('--dataset', default="cifar10", type=str)
 parser.add_argument('--epochs', default=1000, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--lr', default=5e-2, type=float)
@@ -49,19 +51,19 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
-        p_model = resnet18()
+        p_model = resnet32()
         p_model = p_model.to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
 
         # pseudo update model_meta
-        rep1, code1 = p_model(x1)
+        rep1 = p_model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2, code2 = p_model(x2)
+        rep2 = p_model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
-        p_rep1 = teacher(code1.detach())
-        p_rep2 = teacher(code2.detach())
+        p_rep1 = teacher(x1)
+        p_rep2 = teacher(x2)
         p_rep = torch.stack((p_rep1, p_rep2), dim=2)
         p_rep = F.normalize(p_rep, p=2, dim=1)
 
@@ -82,9 +84,9 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x_meta1 = x_meta1.to(device)
         x_meta2 = x_meta2.to(device)
         # meta update teacher
-        meta_rep1, _ = p_model(x_meta1)
+        meta_rep1 = p_model(x_meta1)
         meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
-        meta_rep2, _ = p_model(x_meta2)
+        meta_rep2 = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
         loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
@@ -94,14 +96,14 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         optim_teacher.step()
 
         # update model
-        rep1, code1 = model(x1)
+        rep1 = model(x1)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2, code2 = model(x2)
+        rep2 = model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         with torch.no_grad():
-            p_rep1 = teacher(code1.detach())
-            p_rep2 = teacher(code2.detach())
+            p_rep1 = teacher(x1)
+            p_rep2 = teacher(x2)
             p_rep = torch.stack((p_rep1, p_rep2), dim=2)
             p_rep = F.normalize(p_rep, p=2, dim=1)
 
@@ -173,23 +175,25 @@ def test(model, valid_loader, device):
 def main(device):
     wandb.init(project="MetaRL", entity="ebkim")
     wandb.config = {
+        "dataset": args.dataset,
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "learning_rate": args.lr,
         "weight_decay": args.w_decay,
         "temperature": args.temp,
-        "rep_dim": 1024
+        "rep_dim": 64 
     }
     best_train_acc = -1.0
     best_valid_acc = -1.0
 
-    model = resnet18()
+    model = resnet32()
     model = model.to(device)
 
-    teacher = Teacher()
+    # teacher = Teacher()
+    teacher = resnet32()
     teacher = teacher.to(device)
 
-    train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(batch_size=args.batch_size, num_worker=4, path=args.path)
+    train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(type_dataset=args.dataset, batch_size=args.batch_size, num_worker=4, path=args.path)
 
     optim_model = torch.optim.SGD(model.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
     optim_teacher = torch.optim.SGD(teacher.parameters(), args.lr, momentum=0.9, weight_decay=args.w_decay)
