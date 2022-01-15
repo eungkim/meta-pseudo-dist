@@ -33,7 +33,7 @@ args = parser.parse_args()
 
 # torch settings
 torch.manual_seed(816)
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"device: {device}")
 

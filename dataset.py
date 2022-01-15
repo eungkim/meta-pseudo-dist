@@ -8,9 +8,9 @@ import numpy as np
 from PIL import Image
 
 
-def build_dataset(type_dataset="cifar10", batch_size=256, num_worker=4, path="data/ImageNet/"):
+def build_dataset(type_dataset="cifar10", batch_size=256, num_worker=4, path="data/cifar10/"):
     normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
-    if type_dataset=="cifar10": ###################to edit
+    if type_dataset=="cifar10":
         train_transform = transforms.Compose([
             transforms.RandomResizedCrop(32),
             transforms.RandomHorizontalFlip(),
