@@ -163,7 +163,7 @@ def test(model, valid_loader, device):
                 rep = F.normalize(rep, p=2, dim=1)
                 y_est = linear(rep)
 
-                predicted = y_est.max(1)
+                _, predicted = y_est.max(1)
                 correct+=predicted.eq(y).sum().item()
         
             acc = 100. * correct / len(valid_loader.dataset)
