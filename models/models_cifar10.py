@@ -92,6 +92,7 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
+        print(x.size())
         x = F.avg_pool2d(x, x.size()[3])
         x = x.view(x.size(0), -1)
 

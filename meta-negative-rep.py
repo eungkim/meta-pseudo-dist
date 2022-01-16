@@ -22,7 +22,7 @@ import wandb
 # args
 parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural Pacer Training')
 parser.add_argument('--dataset', default="cifar10", type=str)
-parser.add_argument('--epochs', default=1000, type=int)
+parser.add_argument('--epochs', default=800, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
@@ -129,14 +129,17 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 def test(model, valid_loader, device):
     # to edit
     model.eval()
-    linear = nn.Linear(1024,1000)
+    if args.dataset=="cifar10":
+        linear = nn.Linear(64,10)
+    elif args.dataset=="imagenet":
+        linear = nn.Linear(1024, 1000)
 
-    optimizer = optim.Adam(linear, lr=1e-3, weight_decay=args.w_decay)
+    optimizer = optim.Adam(linear, lr=5e-2)
     criterion = nn.CrossEntropyLoss().to(device)
 
     i = 0
     best_acc = -1.0
-    while i!=3:
+    for _ in range(100):
         for x, y in valid_loader:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
