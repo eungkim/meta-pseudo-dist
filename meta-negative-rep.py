@@ -135,6 +135,7 @@ def test(model, valid_loader, device):
     elif args.dataset=="imagenet":
         linear = nn.Linear(1024, 1000)
 
+    linear = linear.to(device)
     optimizer = optim.Adam(linear.parameters(), lr=5e-2)
     criterion = nn.CrossEntropyLoss().to(device)
 
