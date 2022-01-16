@@ -73,7 +73,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
 
         self.fc1 = nn.Linear(64, 64)
-        self.bn1 = nn.BatchNorm1d(64)
+        self.fc1_bn = nn.BatchNorm1d(64)
         self.fc2 = nn.Linear(64, 64)
 
         self.apply(_weights_init)
@@ -95,7 +95,7 @@ class ResNet(nn.Module):
         x = F.avg_pool2d(x, x.size()[3])
         x = x.view(x.size(0), -1)
 
-        x = F.relu(self.bn1(self.fc1(x)))
+        x = F.relu(self.fc1_bn(self.fc1(x)))
         x = self.fc2(x)
         return x
 
