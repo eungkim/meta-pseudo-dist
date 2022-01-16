@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(description='Pytorch Implementation of Neural P
 parser.add_argument('--dataset', default="cifar10", type=str)
 parser.add_argument('--epochs', default=800, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
+parser.add_argument('--latent', default=64, type=int)
 parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
@@ -51,7 +52,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
-        p_model = resnet32()
+        p_model = resnet32(args.latent)
         p_model = p_model.to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
@@ -143,7 +144,7 @@ def test(model, valid_loader, device):
         for x, y in valid_loader:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
-                rep, _ = model(x)
+                rep = model(x)
                 rep = F.normalize(rep, p=2, dim=1)
             y_est = linear(rep)
             loss = criterion(y_est, y)
@@ -157,7 +158,7 @@ def test(model, valid_loader, device):
         with torch.no_grad():
             for x, y in valid_loader:
                 x, y = x.to(device), y.to(device)
-                rep, _ = model(x)
+                rep = model(x)
                 rep = F.normalize(rep, p=2, dim=1)
                 y_est = linear(rep)
 
@@ -184,16 +185,16 @@ def main(device):
         "learning_rate": args.lr,
         "weight_decay": args.w_decay,
         "temperature": args.temp,
-        "rep_dim": 64 
+        "latent_dim": 64 
     }
     best_train_acc = -1.0
     best_valid_acc = -1.0
 
-    model = resnet32()
+    model = resnet32(args.latent)
     model = model.to(device)
 
     # teacher = Teacher()
-    teacher = resnet32()
+    teacher = resnet32(args.latent)
     teacher = teacher.to(device)
 
     train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(type_dataset=args.dataset, batch_size=args.batch_size, num_worker=4, path=args.path)

@@ -1,3 +1,4 @@
+from re import A
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -62,7 +63,7 @@ class BasicBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks):
+    def __init__(self, block, num_blocks, latent):
         super(ResNet, self).__init__()
         self.in_planes = 16
 
@@ -72,9 +73,18 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
 
-        self.fc1 = nn.Linear(64, 64)
-        self.fc1_bn = nn.BatchNorm1d(64)
-        self.fc2 = nn.Linear(64, 64)
+        if latent<=64:
+            self.out_dim = 64
+        elif latent<=256:
+            self.out_dim = 256
+        elif latent<=1024:
+            self.out_dim = 1024
+        else:
+            self.out_dim = 4096
+
+        self.fc1 = nn.Linear(self.out_dim, latent)
+        self.fc1_bn = nn.BatchNorm1d(latent)
+        self.fc2 = nn.Linear(latent, latent)
 
         self.apply(_weights_init)
 
@@ -93,7 +103,15 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         # [B, 64, 8, 8]
-        x = F.avg_pool2d(x, x.size()[3])
+        if self.out_dim==64:
+            x = F.avg_pool2d(x, x.size()[3]) #[B, 64, 1, 1]
+        elif self.out_dim==256:
+            x = F.adaptive_avg_pool2d(x, (2, 2)) #[B, 64, 2, 2] to [B, 256]
+        elif self.out_dim==1024:
+            x = F.adaptive_avg_pool2d(x, (4, 4)) #[B, 64, 4, 4] to [B, 1024]
+        else:
+            pass
+
         x = x.view(x.size(0), -1)
 
         x = F.relu(self.fc1_bn(self.fc1(x)))
@@ -101,8 +119,8 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet32():
-    return ResNet(BasicBlock, [5, 5, 5])
+def resnet32(latent):
+    return ResNet(BasicBlock, [5, 5, 5], latent)
 
 
 class Teacher(nn.Module):
