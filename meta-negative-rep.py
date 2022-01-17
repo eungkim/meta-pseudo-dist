@@ -15,6 +15,7 @@ import numpy as np
 from models.models_imagenet import resnet18, resnet50, Teacher
 from models.models_cifar10 import resnet32
 from dataset import build_dataset
+from utils import adjust_learning_rate
 
 import wandb
 
@@ -30,6 +31,8 @@ parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
 parser.add_argument('--path', default="/home/", type=str)
 parser.add_argument('--gpu', default='0', type=str)
+parser.add_argument('--linear_lr', default=30.0, type=float)
+parser.add_argument('--linear_schedule', default=[60, 80], type=int)
 
 args = parser.parse_args()
 
@@ -128,7 +131,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
     return train_loss/iter_num, meta_loss/iter_num
 
 
-def test(model, valid_loader, device):
+def test(model, train_loader, valid_loader, device):
     # to edit
     model.eval()
     if args.dataset=="cifar10":
@@ -137,13 +140,12 @@ def test(model, valid_loader, device):
         linear = nn.Linear(1024, 1000)
 
     linear = linear.to(device)
-    optimizer = optim.Adam(linear.parameters(), lr=5e-2)
+    optimizer = optim.SGD(linear.parameters(), lr=args.linear_lr, momentum=0.9)
     criterion = nn.CrossEntropyLoss().to(device)
 
-    i = 0
-    best_acc = -1.0
-    for _ in range(100):
-        for x, y in valid_loader:
+    for i in range(90):
+        adjust_learning_rate(optimizer, i, args)
+        for x, y in train_loader:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
                 rep = model(x)
@@ -155,27 +157,33 @@ def test(model, valid_loader, device):
             loss.backward()
             optimizer.step()
 
-        correct = 0
+    correct = 0
+    with torch.no_grad():
+        for x, y in train_loader:
+            x, y = x.to(device), y.to(device)
+            rep = model(x)
+            rep = F.normalize(rep, p=2, dim=1)
+            y_est = linear(rep)
 
-        with torch.no_grad():
-            for x, y in valid_loader:
-                x, y = x.to(device), y.to(device)
-                rep = model(x)
-                rep = F.normalize(rep, p=2, dim=1)
-                y_est = linear(rep)
+            _, predicted = y_est.max(1)
+            correct+=predicted.eq(y).sum().item()
+    
+        train_acc = 100. * correct / len(train_loader.dataset)
+    
+    correct = 0
+    with torch.no_grad():
+        for x, y in valid_loader:
+            x, y = x.to(device), y.to(device)
+            rep = model(x)
+            rep = F.normalize(rep, p=2, dim=1)
+            y_est = linear(rep)
 
-                _, predicted = y_est.max(1)
-                correct+=predicted.eq(y).sum().item()
-        
-            acc = 100. * correct / len(valid_loader.dataset)
-        
-        if acc>=best_acc:
-            best_acc = acc
-            i = 0
-        else:
-            i+=1
+            _, predicted = y_est.max(1)
+            correct+=predicted.eq(y).sum().item()
+    
+        valid_acc = 100. * correct / len(valid_loader.dataset)
 
-    return best_acc
+    return train_acc, valid_acc
 
 
 def main(device):
@@ -189,7 +197,6 @@ def main(device):
         "temperature": args.temp,
         "latent_dim": 64 
     }
-    best_train_acc = -1.0
     best_valid_acc = -1.0
 
     model = resnet32(args.latent)
@@ -213,16 +220,11 @@ def main(device):
         # if (epoch+1)%5==0:
         print(f"Epoch: [{epoch}/{args.epochs}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
         
-        train_acc = test(model=model, valid_loader=train_acc_loader, device=device)
-        print(f"Epoch: [{epoch}/{args.epochs}]\t Train Accuracy: [{train_acc}]")
-        if train_acc>=best_train_acc:
-            best_train_acc = train_acc 
-        
-        valid_acc = test(model=model, valid_loader=valid_loader, device=device)
-        print(f"Epoch: [{epoch}/{args.epochs}]\t Valid Accuracy: [{valid_acc}]")
+        train_acc, valid_acc = test(model=model, train_loader=train_acc_loader, valid_loader=valid_loader, device=device)
+        print(f"Epoch: [{epoch}/{args.epochs}]\t Train Accuracy: [{train_acc}]\t Valid Accuracy: [{valid_acc}]")
         if valid_acc>=best_valid_acc:
-            best_valid_acc = valid_acc
-            torch.save(model.state_dict(), f"saved_models/epoch{epoch}.pth")
+            best_valid_acc = valid_acc 
+            torch.save(model.state_dict(), f"saved_models/epoch{epoch}_b{args.batch_size}_dim{args.latent}.pth")
 
         wandb.log({
             "train loss": train_loss,
