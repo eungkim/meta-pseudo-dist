@@ -195,7 +195,7 @@ def main(device):
         "learning_rate": args.lr,
         "weight_decay": args.w_decay,
         "temperature": args.temp,
-        "latent_dim": 64 
+        "latent_dim": args.latent
     }
     best_valid_acc = -1.0
 
