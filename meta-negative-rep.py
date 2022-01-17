@@ -132,7 +132,7 @@ def test(model, valid_loader, device):
     # to edit
     model.eval()
     if args.dataset=="cifar10":
-        linear = nn.Linear(64,10)
+        linear = nn.Linear(args.latent,10)
     elif args.dataset=="imagenet":
         linear = nn.Linear(1024, 1000)
 
