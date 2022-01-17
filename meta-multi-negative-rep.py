@@ -191,7 +191,7 @@ def main(device):
 
     # teacher = Teacher()
     teacher = t_resnet32(args.latent)
-    teacher = t_resnet32.to(device)
+    teacher = teacher.to(device)
 
     train_loader, train_meta_loader, train_acc_loader, valid_loader = build_dataset(type_dataset=args.dataset, batch_size=args.batch_size, num_worker=4, path=args.path)
 
