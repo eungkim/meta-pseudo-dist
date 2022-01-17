@@ -48,6 +48,7 @@ print(f"device: {device}")
 
 # train
 def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, p_lr, device):
+    p_train_loss = 0
     train_loss = 0
     meta_loss = 0
 
@@ -63,19 +64,19 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         p_model.train()
 
         # pseudo update model_meta
-        rep1 = p_model(x1)
-        rep2 = p_model(x2)
-        p_rep1 = teacher(x1)
-        p_rep2 = teacher(x2)
+        p_rep1 = p_model(x1)
+        p_rep2 = p_model(x2)
+        pn_rep1 = teacher(x1)
+        pn_rep2 = teacher(x2)
 
-        loss_p = calcul_multi_neg_loss(rep1, rep2, p_rep1, p_rep2, args)
-        grads = torch.autograd.grad(loss_p, (p_model.parameters()), create_graph=True)
+        loss_p = calcul_multi_neg_loss(p_rep1, p_rep2, pn_rep1, pn_rep2, args)
+        p_grads = torch.autograd.grad(loss_p, (p_model.parameters()), create_graph=True)
 
         p_optim_model = MetaSGD(p_model, p_model.parameters(), lr=p_lr)
         p_optim_model.load_state_dict(optim_model.state_dict())
-        p_optim_model.meta_step(grads)
+        p_optim_model.meta_step(p_grads)
 
-        del grads
+        del p_grads
 
         x_meta1 = x_meta1.to(device)
         x_meta2 = x_meta2.to(device)
@@ -98,22 +99,23 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         with torch.no_grad():
-            p_rep1 = teacher(x1)
-            p_rep2 = teacher(x2)
+            n_rep1 = teacher(x1)
+            n_rep2 = teacher(x2)
 
-        loss_p = calcul_multi_neg_loss(rep1, rep2, p_rep1, p_rep2, args)
+        loss = calcul_multi_neg_loss(rep1, rep2, n_rep1, n_rep2, args)
 
         optim_model.zero_grad()
-        loss_p.backward()
+        loss.backward()
         optim_model.step()
 
         # print loss
-        train_loss += loss_p.item()
+        p_train_loss += loss_p.item()
+        train_loss += loss.item()
         meta_loss += loss_meta.item()
 
     iter_num = len(train_loader.dataset)
 
-    return train_loss/iter_num, meta_loss/iter_num
+    return p_train_loss/iter_num, train_loss/iter_num, meta_loss/iter_num
 
 
 def test(model, train_loader, valid_loader, device):
@@ -201,11 +203,11 @@ def main(device):
     scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
 
     for epoch in range(args.epochs):
-        train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, scheduler_model.get_last_lr()[0], device)
+        p_train_loss, train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, scheduler_model.get_last_lr()[0], device)
         scheduler_model.step()
         scheduler_teacher.step()
         # if (epoch+1)%5==0:
-        print(f"Epoch: [{epoch}/{args.epochs}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
+        print(f"Epoch: [{epoch}/{args.epochs}]\t Pseudo Loss: [{p_train_loss}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
         
         if ((epoch+1)%50)==0:
             train_acc, valid_acc = test(model=model, train_loader=train_acc_loader, valid_loader=valid_loader, device=device)
@@ -216,6 +218,7 @@ def main(device):
 
             wandb.log({
                 "epoch": epoch,
+                "pseudo train loss": p_train_loss,
                 "train loss": train_loss,
                 "meta loss": meta_loss,
                 "train accuracy": train_acc, 
