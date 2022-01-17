@@ -125,7 +125,7 @@ def resnet32(latent):
 
 class TResNet(nn.Module):
     def __init__(self, block, num_blocks, latent):
-        super(ResNet, self).__init__()
+        super(TResNet, self).__init__()
         self.in_planes = 16
         self.latent = latent
 
