@@ -101,7 +101,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
             p_rep1 = teacher(x1)
             p_rep2 = teacher(x2)
 
-        loss_p = calcul_loss(rep1, rep2, p_rep1, p_rep2)
+        loss_p = calcul_loss(rep1, rep2, p_rep1, p_rep2, args)
 
         optim_model.zero_grad()
         loss_p.backward()
