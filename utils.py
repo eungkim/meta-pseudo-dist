@@ -36,3 +36,21 @@ def calcul_loss(rep1, rep2, n_rep1, n_rep2, args):
         print("error")
 
     return loss_p
+
+def calcul_mul_neg_loss(rep1, rep2, n_rep1, n_rep2, args):
+    rep1 = F.normalize(rep1, p=2, dim=1)
+    rep2 = F.normalize(rep2, p=2, dim=1)
+    n_rep1 = F.normalize(n_rep1, p=2, dim=1)
+    n_rep2 = F.normalize(n_rep2, p=2, dim=1)
+
+    loss_pos = torch.sum(rep1 * rep2, dim=-1) / args.temp
+
+    rep1 = rep1.unsqueeze(dim=1)
+    rep2 = rep2.unsqueeze(dim=1)
+    loss_neg1_matrix = torch.exp(torch.matmul(rep1, n_rep1) / args.temp)
+    loss_neg1 = loss_neg1_matrix.view(loss_neg1_matrix.size(0), -1).sum(dim=-1)
+    loss_neg2_matrix = torch.exp(torch.matmul(rep2, n_rep2) / args.temp)
+    loss_neg2 = loss_neg2_matrix.view(loss_neg2_matrix.size(0), -1).sum(dim=-1)
+
+    loss_p = (-loss_pos + torch.log(loss_neg1 + loss_neg2)).mean()
+    return loss_p

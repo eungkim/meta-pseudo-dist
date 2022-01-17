@@ -123,16 +123,47 @@ def resnet32(latent):
     return ResNet(BasicBlock, [5, 5, 5], latent)
 
 
-class Teacher(nn.Module):
-    def __init__(self):
-        super(Teacher, self).__init__()
-        expansion = 1
-        self.fc1 = nn.Linear(64, 64)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.fc2 = nn.Linear(64, 64)
+class TResNet(nn.Module):
+    def __init__(self, block, num_blocks, latent):
+        super(ResNet, self).__init__()
+        self.in_planes = 16
+        self.latent = latent
+
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
+
+        self.fc1 = nn.Linear(64*8*8, 64*8*8)
+        self.fc1_bn = nn.BatchNorm1d(64*8*8)
+        self.fc2 = nn.Linear(64*8*8, 64*8*8)
+
+        self.apply(_weights_init)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+
+        return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = F.relu(self.bn1(self.fc1(x)))
-        x = self.fc2(x)
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
 
+        # [B, 64*8*8]
+        x = x.view(x.size(0), -1)
+
+        x = F.relu(self.fc1_bn(self.fc1(x)))
+        x = self.fc2(x)
+        x = x.view(x.size(0), self.latent, -1)
         return x
+
+
+def t_resnet32(latent):
+    return TResNet(BasicBlock, [5, 5, 5], latent)
