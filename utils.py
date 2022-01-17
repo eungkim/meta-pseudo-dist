@@ -37,7 +37,7 @@ def calcul_loss(rep1, rep2, n_rep1, n_rep2, args):
 
     return loss_p
 
-def calcul_mul_neg_loss(rep1, rep2, n_rep1, n_rep2, args):
+def calcul_multi_neg_loss(rep1, rep2, n_rep1, n_rep2, args):
     rep1 = F.normalize(rep1, p=2, dim=1)
     rep2 = F.normalize(rep2, p=2, dim=1)
     n_rep1 = F.normalize(n_rep1, p=2, dim=1)
