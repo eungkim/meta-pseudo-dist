@@ -85,8 +85,8 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         meta_rep2 = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
-        print(loss_meta.size())
         loss_meta = -torch.sum(meta_rep1 * meta_rep2, dim=-1)
+        print(loss_meta.size())
 
         optim_teacher.zero_grad()
         loss_meta.backward()
