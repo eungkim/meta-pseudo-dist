@@ -26,7 +26,7 @@ parser.add_argument('--dataset', default="cifar10", type=str)
 parser.add_argument('--epochs', default=800, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--latent', default=64, type=int)
-parser.add_argument('--loss', default="ntxent", type=str)
+parser.add_argument('--loss', default="uni", type=str)
 parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
@@ -176,13 +176,13 @@ def main(device):
     wandb.config = {
         "dataset": args.dataset,
         "loss": args.loss,
+        "neg_type": "multi-neg",
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "learning_rate": args.lr,
         "weight_decay": args.w_decay,
         "temperature": args.temp,
-        "latent_dim": args.latent,
-        "neg_type": "multi-neg"
+        "latent_dim": args.latent
     }
     best_valid_acc = -1.0
 
