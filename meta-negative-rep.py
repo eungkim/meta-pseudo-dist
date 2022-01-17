@@ -15,7 +15,7 @@ import numpy as np
 from models.models_imagenet import resnet18, resnet50, Teacher
 from models.models_cifar10 import resnet32
 from dataset import build_dataset
-from utils import adjust_learning_rate
+from utils import adjust_learning_rate, calcul_loss
 
 import wandb
 
@@ -26,6 +26,7 @@ parser.add_argument('--dataset', default="cifar10", type=str)
 parser.add_argument('--epochs', default=800, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--latent', default=64, type=int)
+parser.add_argument('--loss', default="ntxent", type=str)
 parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
@@ -63,26 +64,11 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 
         # pseudo update model_meta
         rep1 = p_model(x1)
-        rep1 = F.normalize(rep1, p=2, dim=1)
         rep2 = p_model(x2)
-        rep2 = F.normalize(rep2, p=2, dim=1)
-
         p_rep1 = teacher(x1)
         p_rep2 = teacher(x2)
-        p_rep = torch.stack((p_rep1, p_rep2), dim=2)
-        p_rep = F.normalize(p_rep, p=2, dim=1)
 
-        loss_pos = torch.sum(rep1 * rep2, dim=-1) / temperature
-        """
-        rep = torch.stack((rep1, rep2), dim=1)
-        loss_neg_matrix = torch.exp(torch.matmul(rep, p_rep) / temperature)
-        loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
-        loss_p = (- loss_pos + torch.log(loss_neg)).mean()
-        """
-        loss_neg1 = torch.sum(rep1 * p_rep1, dim=-1) / temperature
-        loss_neg2 = torch.sum(rep2 * p_rep2, dim=-1) / temperature
-        loss_p = -loss_pos + torch.log(torch.exp(loss_pos) + torch.exp(loss_neg1) + torch.exp(loss_neg2))
-
+        loss_p = calcul_loss(rep1, rep2, p_rep1, p_rep2, args)
         grads = torch.autograd.grad(loss_p, (p_model.parameters()), create_graph=True)
 
         p_optim_model = MetaSGD(p_model, p_model.parameters(), lr=p_lr)
@@ -99,7 +85,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         meta_rep2 = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
         
-        loss_meta = (-torch.sum(meta_rep1 * meta_rep2, dim=-1) / temperature).mean()
+        loss_meta = -torch.sum(meta_rep1 * meta_rep2, dim=-1)
 
         optim_teacher.zero_grad()
         loss_meta.backward()
@@ -114,19 +100,8 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         with torch.no_grad():
             p_rep1 = teacher(x1)
             p_rep2 = teacher(x2)
-            p_rep = torch.stack((p_rep1, p_rep2), dim=2)
-            p_rep = F.normalize(p_rep, p=2, dim=1)
 
-        loss_pos = torch.sum(rep1 * rep2, dim=-1) / temperature
-        """
-        rep = torch.stack((rep1, rep2), dim=1)
-        loss_neg_matrix = torch.exp(torch.matmul(rep, p_rep) / temperature)
-        loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
-        loss_p = (- loss_pos + torch.log(loss_neg)).mean()
-        """
-        loss_neg1 = torch.sum(rep1 * p_rep1, dim=-1) / temperature
-        loss_neg2 = torch.sum(rep2 * p_rep2, dim=-1) / temperature
-        loss_p = -loss_pos + torch.log(torch.exp(loss_pos) + torch.exp(loss_neg1) + torch.exp(loss_neg2))
+        loss_p = calcul_loss(rep1, rep2, p_rep1, p_rep2)
 
         optim_model.zero_grad()
         loss_p.backward()
@@ -200,6 +175,7 @@ def main(device):
     wandb.init(project="MetaRL", entity="ebkim")
     wandb.config = {
         "dataset": args.dataset,
+        "loss": args.loss,
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "learning_rate": args.lr,
