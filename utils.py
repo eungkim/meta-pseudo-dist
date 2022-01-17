@@ -25,7 +25,7 @@ def calcul_loss(rep1, rep2, n_rep1, n_rep2, args):
         rep = torch.stack((rep1, rep2), dim=1)
         loss_neg_matrix = torch.exp(torch.matmul(rep, p_rep) / args.temp)
         loss_neg = loss_neg_matrix.view(loss_neg_matrix.size(0), -1).sum(dim=-1) # not negative samples but pseudo negative samples
-        loss_p = (- loss_pos + torch.log(loss_neg)).mean()
+        loss_p = (-loss_pos + torch.log(loss_neg)).mean()
 
     elif args.loss=="npair":
         loss_neg1 = torch.sum(rep1 * n_rep1, dim=-1) / args.temp
