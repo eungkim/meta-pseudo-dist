@@ -220,7 +220,7 @@ def main(device):
         # if (epoch+1)%5==0:
         print(f"Epoch: [{epoch}/{args.epochs}]\t Loss: [{train_loss}]\t MetaLoss: [{meta_loss}]")
         
-        if (epoch%100)==0:
+        if ((epoch+1)%50)==0:
             train_acc, valid_acc = test(model=model, train_loader=train_acc_loader, valid_loader=valid_loader, device=device)
             print(f"Epoch: [{epoch}/{args.epochs}]\t Train Accuracy: [{train_acc}]\t Valid Accuracy: [{valid_acc}]")
             if valid_acc>=best_valid_acc:
@@ -228,6 +228,7 @@ def main(device):
                 torch.save(model.state_dict(), f"saved_models/epoch{epoch}_b{args.batch_size}_dim{args.latent}.pth")
 
             wandb.log({
+                "epoch": epoch,
                 "train loss": train_loss,
                 "meta loss": meta_loss,
                 "train accuracy": train_acc, 
