@@ -29,12 +29,13 @@ parser.add_argument('--lr', default=5e-2, type=float)
 parser.add_argument('--w_decay', default=1e-4, type=float)
 parser.add_argument('--temp', default=0.5, type=float)
 parser.add_argument('--path', default="/home/", type=str)
+parser.add_argument('--gpu', default='0', type=str)
 
 args = parser.parse_args()
 
 # torch settings
 torch.manual_seed(816)
-# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"device: {device}")
 
