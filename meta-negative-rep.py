@@ -80,13 +80,20 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
 
         x_meta1 = x_meta1.to(device)
         x_meta2 = x_meta2.to(device)
+
         # meta update teacher
         meta_rep1 = p_model(x_meta1)
         meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
         meta_rep2 = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
+
+        meta_n_rep1 = teacher(x_meta1)
+        meta_n_rep1 = F.normalize(meta_n_rep1, p=2, dim=1)
+        meta_n_rep2 = teacher(x_meta2)
+        meta_n_rep2 = F.normalize(meta_n_rep2, p=2, dim=1)
         
-        loss_meta = (- torch.sum(meta_rep1 * meta_rep2, dim=-1)).mean()
+        # loss_meta = (- torch.sum(meta_rep1 * meta_rep2, dim=-1)).mean()
+        loss_meta = calcul_loss(meta_rep1, meta_rep2, meta_n_rep1, meta_n_rep2, args)
 
         optim_teacher.zero_grad()
         loss_meta.backward()
