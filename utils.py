@@ -44,6 +44,7 @@ def calcul_multi_neg_loss(rep1, rep2, n_rep1, n_rep2, args):
     n_rep2 = F.normalize(n_rep2, p=2, dim=1)
 
     loss_pos = torch.sum(rep1 * rep2, dim=-1) / args.temp
+    print(f"loss_pos {loss_pos}")
 
     if args.loss=="uni":
         rep1 = rep1.unsqueeze(dim=1)
@@ -53,6 +54,8 @@ def calcul_multi_neg_loss(rep1, rep2, n_rep1, n_rep2, args):
         loss_neg2_matrix = torch.exp(torch.matmul(rep2, n_rep2) / args.temp)
         loss_neg2 = loss_neg2_matrix.view(loss_neg2_matrix.size(0), -1).sum(dim=-1)
 
+        print(f"loss_neg1{torch.matmul(rep1, n_rep1)}")
+        print(f"loss_neg2{torch.matmul(rep2, n_rep2)}")
         loss_p = (-loss_pos + torch.log(loss_neg1 + loss_neg2)).mean()
 
     elif args.loss=="cross":
