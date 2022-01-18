@@ -225,6 +225,7 @@ def main(device):
                 "test accuracy": valid_acc 
             })
 
+        torch.save(teacher.state_dict(), f"saved_models/teacher.pth")
     print(f"Best Valid Accuracy: {best_valid_acc}")
 
 if __name__=="__main__":

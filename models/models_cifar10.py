@@ -1,9 +1,6 @@
-from re import A
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-from torch.autograd import Variable
 import torch.nn.init as init
 
 """
