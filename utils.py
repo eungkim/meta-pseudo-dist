@@ -19,7 +19,6 @@ def calcul_loss(rep1, rep2, n_rep1, n_rep2, args):
     n_rep2 = F.normalize(n_rep2, p=2, dim=1)
 
     loss_pos = torch.sum(rep1 * rep2, dim=-1) / args.temp
-    print(f"loss_pos {torch.sum(rep1 * rep2, dim=-1)}")
 
     if args.loss=="ntxent":
         p_rep = torch.stack((n_rep1, n_rep2), dim=2)
@@ -30,7 +29,6 @@ def calcul_loss(rep1, rep2, n_rep1, n_rep2, args):
 
     elif args.loss=="npair":
         loss_neg1 = torch.sum(rep1 * n_rep1, dim=-1) / args.temp
-        print(f"loss neg1 {torch.sum(rep1 * n_rep1, dim=-1)}")
         loss_neg2 = torch.sum(rep2 * n_rep2, dim=-1) / args.temp
         loss_p = (-loss_pos + torch.log(torch.exp(loss_pos) + torch.exp(loss_neg1) + torch.exp(loss_neg2))).mean()
 
