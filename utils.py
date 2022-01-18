@@ -44,7 +44,7 @@ def calcul_multi_neg_loss(rep1, rep2, n_rep1, n_rep2, args):
     n_rep2 = F.normalize(n_rep2, p=2, dim=1)
 
     loss_pos = torch.sum(rep1 * rep2, dim=-1) / args.temp
-    print(f"loss_pos {loss_pos}")
+    print(f"loss_pos {torch.sum(rep1 * rep2, dim=-1)}")
 
     if args.loss=="uni":
         rep1 = rep1.unsqueeze(dim=1)
