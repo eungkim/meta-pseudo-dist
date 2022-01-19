@@ -71,9 +71,11 @@ def calcul_meta_loss(rep1, rep2, n_rep1, n_rep2, args):
     n_rep1 = F.normalize(n_rep1, p=2, dim=1)
     n_rep2 = F.normalize(n_rep2, p=2, dim=1)
 
-    loss_pos = torch.sum(rep1 * rep2, dim=-1) / args.temp
-    loss_neg1 = torch.sum(rep1.detach() * n_rep1, dim=-1) / args.temp
-    loss_neg2 = torch.sum(rep2.detach() * n_rep2, dim=-1) / args.temp
-    loss_p = (- loss_pos - loss_neg1 - loss_neg2).mean()
+    loss_pos1 = torch.sum(rep1 * rep2, dim=-1) / args.temp
+    loss_pos2 = torch.sum(rep1.detach() * n_rep1, dim=-1) / args.temp
+    loss_pos3 = torch.sum(rep2.detach() * n_rep2, dim=-1) / args.temp
+    loss_neg1 = torch.sum(rep1 * n_rep1.detach(), dim=-1) / args.temp
+    loss_neg2 = torch.sum(rep2 * n_rep2.detach(), dim=-1) / args.temp
+    loss_p = (-torch.log(torch.exp(loss_pos1)+torch.exp(loss_pos2)+torch.exp(loss_pos3)) + torch.log(torch.exp(loss_neg1)+torch.exp(loss_neg2))).mean()
 
     return loss_p

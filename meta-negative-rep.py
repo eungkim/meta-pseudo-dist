@@ -96,6 +96,7 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         # window0 loss_meta = calcul_loss(meta_rep1, meta_rep2, meta_n_rep1, meta_n_rep2, args)
         # window1 loss_meta = calcul_loss(meta_rep1, meta_rep2, meta_n_rep1.detach(), meta_n_rep2.detach(), args)
         loss_meta = calcul_meta_loss(meta_rep1, meta_rep2, meta_n_rep1, meta_n_rep2, args)
+        #window 2 (above calcul_meta_loss)
 
         optim_teacher.zero_grad()
         loss_meta.backward()
