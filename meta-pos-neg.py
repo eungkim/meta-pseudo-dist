@@ -138,7 +138,7 @@ def test(model, train_loader, valid_loader, device):
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
             with torch.no_grad():
-                rep = model(x)
+                rep, _ = model(x, x)
                 rep = F.normalize(rep, p=2, dim=1)
             y_est = linear(rep)
             loss = criterion(y_est, y)
@@ -151,7 +151,7 @@ def test(model, train_loader, valid_loader, device):
     with torch.no_grad():
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
-            rep = model(x)
+            rep, _ = model(x, x)
             rep = F.normalize(rep, p=2, dim=1)
             y_est = linear(rep)
 
