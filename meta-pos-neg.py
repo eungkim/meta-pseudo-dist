@@ -206,7 +206,7 @@ def main(device):
     scheduler_teacher = torch.optim.lr_scheduler.CosineAnnealingLR(optim_teacher, T_max=args.epochs, eta_min=0)
 
     for epoch in range(args.epochs):
-        p_train_loss, train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, scheduler_model.get_last_lr()[0], args.temp, device)
+        p_train_loss, train_loss, meta_loss = train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, scheduler_model.get_last_lr()[0], device)
         scheduler_model.step()
         scheduler_teacher.step()
         # if (epoch+1)%5==0:
