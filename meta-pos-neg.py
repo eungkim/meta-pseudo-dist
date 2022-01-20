@@ -13,7 +13,7 @@ from torch.autograd import Variable
 import numpy as np
 
 from models.models_imagenet import resnet18, resnet50, Teacher
-from models.models_cifar10 import resnet32
+from models.models_cifar10 import resnet32, dresnet32
 from dataset import build_dataset
 from utils import adjust_learning_rate, calcul_loss, calcul_meta_loss
 
@@ -47,7 +47,7 @@ print(f"device: {device}")
 
 
 # train
-def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, p_lr, temperature, device):
+def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_teacher, p_lr, device):
     p_train_loss = 0
     train_loss = 0
     meta_loss = 0
@@ -58,14 +58,13 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x1 = x1.to(device)
         x2 = x2.to(device)
 
-        p_model = resnet32(args.latent)
+        p_model = dresnet32(args.latent)
         p_model = p_model.to(device)
         p_model.load_state_dict(model.state_dict())
         p_model.train()
 
         # pseudo update model_meta
-        p_rep1 = p_model(x1)
-        p_rep2 = p_model(x2)
+        p_rep1, p_rep2 = p_model(x1, x2)
         pn_rep1 = teacher(x1)
         pn_rep2 = teacher(x2)
 
@@ -82,27 +81,19 @@ def train(train_loader, train_meta_loader, model, optim_model, teacher, optim_te
         x_meta2 = x_meta2.to(device)
 
         # meta update teacher
-        meta_rep1 = p_model(x_meta1)
+        meta_rep1, meta_rep2 = p_model(x_meta1, x_meta2)
         meta_rep1 = F.normalize(meta_rep1, p=2, dim=1)
-        meta_rep2 = p_model(x_meta2)
         meta_rep2 = F.normalize(meta_rep2, p=2, dim=1)
 
-        meta_n_rep1 = teacher(x_meta1)
-        meta_n_rep1 = F.normalize(meta_n_rep1, p=2, dim=1)
-        meta_n_rep2 = teacher(x_meta2)
-        meta_n_rep2 = F.normalize(meta_n_rep2, p=2, dim=1)
-        
-        # loss_meta = (- torch.sum(meta_rep1 * meta_rep2, dim=-1)).mean()
-        loss_meta = calcul_meta_loss(meta_rep1, meta_rep2, args)
+        loss_meta = (- torch.sum(meta_rep1 * meta_rep2, dim=-1)).mean()
 
         optim_teacher.zero_grad()
         loss_meta.backward()
         optim_teacher.step()
 
         # update model
-        rep1 = model(x1)
+        rep1, rep2 = model(x1, x2)
         rep1 = F.normalize(rep1, p=2, dim=1)
-        rep2 = model(x2)
         rep2 = F.normalize(rep2, p=2, dim=1)
 
         with torch.no_grad():
@@ -194,7 +185,7 @@ def main(device):
     }
     best_valid_acc = -1.0
 
-    model = resnet32(args.latent)
+    model = dresnet32(args.latent)
     model = model.to(device)
 
     # teacher = Teacher()

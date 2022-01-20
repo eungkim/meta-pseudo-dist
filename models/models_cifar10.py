@@ -119,6 +119,19 @@ class ResNet(nn.Module):
 def resnet32(latent):
     return ResNet(BasicBlock, [5, 5, 5], latent)
 
+class DoubleResNet(nn.Module):
+    def __init__(self, model1, model2):
+        super(DoubleResNet, self).__init__()
+        self.model1 = model1
+        self.model2 = model2
+    
+    def forward(self, x1, x2):
+        x1 = self.model1(x1)
+        x2 = self.model2(x2)
+        return x1, x2
+
+def dresnet32(latent):
+    return DoubleResNet(ResNet(BasicBlock, [5, 5, 5], latent), ResNet(BasicBlock, [5, 5, 5], latent))
 
 class TResNet(nn.Module):
     def __init__(self, block, num_blocks, latent):
